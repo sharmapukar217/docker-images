@@ -1,0 +1,47 @@
+version: "3"
+
+networks:
+  internal:
+    driver: bridge
+
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: ${APP_NAME}_nginx
+    ports:
+      - ${NGINX_PORT:-3000}:80
+    links:
+       - php
+    depends_on:
+      - php
+    volumes:
+      - ./docker/logs/nginx:/var/logs/nginx:rw
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:rw
+    networks:
+      - internal
+
+  php:
+    build: .
+    image: php:fpm-alpine
+    container_name: ${APP_NAME}_php
+    links:
+      - postgresql
+    depends_on:
+      - postgresql
+    networks:
+      - internal
+
+  postgresql:
+    image: postgres:alpine
+    container_name: ${APP_NAME}_postgresql
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: $DB_DATABASE
+      POSTGRES_USER: $DB_USERNAME
+      POSTGRES_PASSWORD: $DB_PASSWORD
+    networks:
+      - internal
+
+volumes:
+  db-data: ~
