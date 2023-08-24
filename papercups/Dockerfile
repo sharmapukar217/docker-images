@@ -14,7 +14,6 @@ ARG BUCKET_NAME
 ARG AWS_REGION
 ARG PAPERCUPS_STRIPE_SECRET
 
-
 ENV MIX_ENV=$MIX_ENV
 ENV APP_VERSION=$APP_VER
 ENV REQUIRE_DB_SSL=$REQUIRE_DB_SSL
@@ -35,20 +34,18 @@ WORKDIR /app
 # clone the source code
 RUN git clone https://github.com/papercups-io/papercups.git papercups
 
-
-### Setup client side ###
-
+##################### Setup client side #################################
 # fix because of https://github.com/facebook/create-react-app/issues/8413
 ENV GENERATE_SOURCEMAP=false
 
 # installing npm packages and building
 WORKDIR assets
-RUN cp ../papercups/assets/package.json ./ \
-    && yarn install --production \
-    && yarn cache clean
+RUN cp ../papercups/assets/package.json .
 
-RUN cp ../papercups/assets/ . -r \
-    && yarn cache clean && yarn build && cd ..
+RUN rm -rf node_modules && mkdir node_modules
+RUN yarn install --frozen-lockfile && yarn cache clean
+
+RUN cp ../papercups/assets/ . -r && yarn build && cd ..
 
 WORKDIR /app
 
