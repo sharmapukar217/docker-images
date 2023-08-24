@@ -5,11 +5,11 @@ LABEL maintainer="Pukar Sharma <sharmapukar217@gmail.com>"
 
 ARG SUPPORTED_LOCALES="en_US.UTF-8"
 
-ENV AKAUNTING_VERSION=3.0.16 \
+ENV NODE_ENVI=production \
     COMPOSER_ALLOW_SUPERUSER=1
 
 # install required dependencies
-RUN apk --no-cache add git python3 nodejs npm icu-dev zlib-dev libpng-dev libzip-dev
+RUN apk --no-cache add git python3 nodejs yarn icu-dev zlib-dev libpng-dev libzip-dev
 
 # install php extensions
 RUN docker-php-ext-install bcmath intl gd zip 
@@ -24,15 +24,23 @@ WORKDIR /var/www/html
 COPY --from=composer:2.4 /usr/bin/composer /usr/bin/composer
 
 # setup src
-RUN git clone https://github.com/akaunting/akaunting.git . \
-    && chown -R www-data:www-data /var/www/html
+RUN git clone https://github.com/akaunting/akaunting.git .
+# && chown -R www-data:www-data /var/www/html \
+# && chmod 755 /var/www/html
 
 # copy env vars
 COPY .env .
 
-# run configuration
-USER www-data
-
 # run building
-RUN composer prod \
-    && npm i && npm run prod
+RUN composer prod 
+
+# install yarn
+## OPTIMIZATION STEPS
+RUN rm -rf node_modules && mkdir node_modules
+RUN yarn install --frozen-lockfile && yarn cache clean 
+RUN yarn run production
+
+# php clear config
+RUN php artisan key:generate \
+    && php artisan config:cache
+

@@ -26,8 +26,7 @@ ENV AWS_REGION=$AWS_REGION
 ENV PAPERCUPS_STRIPE_SECRET=$PAPERCUPS_STRIPE_SECRET
 
 # install required packages
-RUN apk add --no-cache git nodejs npm python3 ca-certificates gnupg make erlang gcc libc-dev \
-    && npm install npm@latest -g
+RUN apk add --no-cache git nodejs yarn python3 ca-certificates gnupg make erlang gcc libc-dev
 
 # setup directories
 RUN mkdir -p /app /app/assets
@@ -37,23 +36,28 @@ WORKDIR /app
 RUN git clone https://github.com/papercups-io/papercups.git papercups
 
 
-# Setup client side
-RUN cp papercups/assets/package.json ./assets
-RUN npm install --prefix=assets
+### Setup client side ###
 
 # fix because of https://github.com/facebook/create-react-app/issues/8413
 ENV GENERATE_SOURCEMAP=false
 
-# copy the frontend source to assets and start to build
-RUN cp papercups/assets . -r
-RUN npm run build --prefix=assets
+# installing npm packages and building
+WORKDIR assets
+RUN cp ../papercups/assets/package.json ./ \
+    && yarn install --production \
+    && yarn cache clean
+
+RUN cp ../papercups/assets/ . -r \
+    && yarn cache clean && yarn build && cd ..
+
+WORKDIR /app
 
 # build elixir(backend)
 RUN cp papercups/mix.exs papercups/mix.lock papercups/config . -r
 
 RUN mix local.hex --force && \ 
-    mix local.rebar --force && \
-    mix deps.get --only prod
+     mix local.rebar --force && \
+     mix deps.get --only prod
 
 
 RUN cp papercups/lib papercups/priv . -r
