@@ -24,3 +24,65 @@ ENV AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 ENV BUCKET_NAME=$BUCKET_NAME
 ENV AWS_REGION=$AWS_REGION
 ENV PAPERCUPS_STRIPE_SECRET=$PAPERCUPS_STRIPE_SECRET
+
+# install required packages
+RUN apk add --no-cache git nodejs npm python3 ca-certificates gnupg make erlang gcc libc-dev \
+    && npm install npm@latest -g
+
+# setup directories
+RUN mkdir -p /app /app/assets
+WORKDIR /app
+
+# clone the source code
+RUN git clone https://github.com/papercups-io/papercups.git papercups
+
+
+# Setup client side
+RUN cp papercups/assets/package.json ./assets
+RUN npm install --prefix=assets
+
+# fix because of https://github.com/facebook/create-react-app/issues/8413
+ENV GENERATE_SOURCEMAP=false
+
+# copy the frontend source to assets and start to build
+RUN cp papercups/assets . -r
+RUN npm run build --prefix=assets
+
+# build elixir(backend)
+RUN cp papercups/mix.exs papercups/mix.lock papercups/config . -r
+
+RUN mix local.hex --force && \ 
+    mix local.rebar --force && \
+    mix deps.get --only prod
+
+
+RUN cp papercups/lib papercups/priv . -r
+
+RUN mix deps.compile \
+    && mix phx.digest priv/static
+
+
+RUN cp papercups/rel . -r
+RUN mix release papercups
+
+# deployment
+FROM alpine:3.13 AS app
+RUN apk add --no-cache openssl ncurses-libs
+ENV LANG=C.UTF-8
+
+
+ENV HOME=/app
+
+RUN adduser -h /app -u 1000 -s /bin/sh -D papercupsuser
+COPY --from=builder --chown=papercupsuser:papercupsuser /app/_build/prod/rel/papercups /app
+COPY --from=builder --chown=papercupsuser:papercupsuser /app/priv /app/priv
+
+RUN chown -R papercupsuser:papercupsuser /app \
+    && cp papercups/docker-entrypoint.sh /entrypoint.sh \
+    &&  chmod a+x /entrypoint.sh
+
+USER papercupsuser
+
+EXPOSE 4000
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["run"]
