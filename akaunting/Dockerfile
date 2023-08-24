@@ -9,7 +9,7 @@ ENV AKAUNTING_VERSION=3.0.16 \
     COMPOSER_ALLOW_SUPERUSER=1
 
 # install required dependencies
-RUN apk --no-cache add git nodejs npm icu-dev zlib-dev libpng-dev libzip-dev
+RUN apk --no-cache add git python nodejs npm icu-dev zlib-dev libpng-dev libzip-dev
 
 # install php extensions
 RUN docker-php-ext-install bcmath intl gd zip 
